@@ -4,16 +4,16 @@ from analyzer import analyze_well_image
 
 # 페이지 기본 설정
 st.set_page_config(
-    page_title="Saliva Hue Analyzer",
+    page_title="ALZ tester",
     page_icon="🧪",
     layout="centered",
 )
 
 # 제목 & 설명
-st.title("🧪 Saliva Color Analyzer")
+st.title("🧪 ALZ tester")
 st.write(
-    "Upload a photo of the saliva reaction well. "
-    "This app calculates the average hue and compares it to a threshold (293°)."
+    "Welcome to ALZ tester! "
+    "This app will help you analyze whether you have Alzheimer's Disease."
 )
 
 # 파일 업로드 UI
@@ -51,9 +51,9 @@ if uploaded_file is not None:
                 st.write(f"**Threshold Hue (Degrees):** `{threshold_deg:.2f}`")
 
                 if above_threshold:
-                    st.success("🟢 Hue is ABOVE threshold (>= 293°).")
+                    st.success("🔴 seeking medical help RECOMMENDED")
                 else:
-                    st.error("🔴 Hue is BELOW threshold (< 293°).")
+                    st.error("🟢 normal")
 
             with col2:
                 st.image(img_rgb, caption="Image used for analysis", use_column_width=True)
@@ -71,4 +71,5 @@ if uploaded_file is not None:
             st.error(f"Error during analysis: {e}")
 else:
     st.info("Upload an image to begin.")
+
 
