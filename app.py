@@ -69,14 +69,14 @@ def render_start():
         if st.button("start", type="primary", use_container_width=True):
             goto("input")
     with col2:
-        if st.button("리셋", use_container_width=True):
+        if st.button("reset", use_container_width=True):
             reset_all("start")
 
     with st.expander("taking photo guide", expanded=True):
         st.markdown(
             "- use a bright, white background"
-            "- ensure the image is clear"
-            "- center the well in the frame"
+            f"- ensure the image is clear"
+            f"- center the well in the frame"
               )
 
 
@@ -244,6 +244,7 @@ elif step == "result":
     render_result()
 else:
     reset_all("start")
+
 
 
 
