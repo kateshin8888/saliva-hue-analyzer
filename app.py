@@ -87,14 +87,14 @@ def render_input():
     render_step_header()
 
     st.header("Upload your picture")
-    st.caption("사진 업로드 후 ‘분석하기’를 눌러야 다음 단계로 넘어갑니 다.")
+    st.caption("After uploading the photo, click Analyze to proceed to the next step.")
 
     with st.form("upload_form", clear_on_submit=False):
         uploaded_file = st.file_uploader(
             "Upload an image (JPG/PNG)",
             type=["jpg", "jpeg", "png"],
         )
-        submitted = st.form_submit_button("분석하기", type="primary", use_container_width=True)
+        submitted = st.form_submit_button("Analyze", type="primary", use_container_width=True)
 
     if uploaded_file is not None:
         st.subheader("Preview")
@@ -112,10 +112,10 @@ def render_input():
     # ✅ 여기서 반드시 col1/col2 둘 다 with로 닫아줘야 함
     col1, col2 = st.columns(2)
     with col1:
-        if st.button("시작 화면", use_container_width=True):
+        if st.button("Starting Page", use_container_width=True):
             goto("start")
     with col2:
-        if st.button("입력 초기화", use_container_width=True):
+        if st.button("Reset", use_container_width=True):
             reset_to_input()
 
 
@@ -244,6 +244,7 @@ elif step == "result":
     render_result()
 else:
     reset_all("start")
+
 
 
 
