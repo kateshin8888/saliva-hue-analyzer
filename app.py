@@ -22,20 +22,25 @@ STEP_LABEL = {
 # -------------------------
 # Session state init
 # -------------------------
-if "step" not in st.session_state:
-    st.session_state.step = "start"
+st.session_state.setdefault("step", "start")
 
 def goto(step: str):
+    """Set step only (no rerun here)."""
     if step not in STEPS:
         step = "start"
     st.session_state.step = step
+
+def navigate(step: str):
+    """Set step + rerun + hard stop (prevents duplicate rendering)."""
+    goto(step)
     st.rerun()
+    st.stop()
 
 def reset_all(to_step: str = "start"):
     st.session_state.pop("uploaded_file_bytes", None)
     st.session_state.pop("uploaded_file_name", None)
     st.session_state.pop("result", None)
-    goto(to_step)
+    navigate(to_step)
 
 def reset_to_input():
     reset_all(to_step="input")
@@ -68,14 +73,12 @@ def render_start():
         "If the result is positive, please consult a healthcare professional for standardized diagnostic evaluation."
     )
 
-    st.markdown(
-        "**Directions:** Prepare a photo taken according to the guide below → Analyze → View results"
-    )
+    st.markdown("**Directions:** Prepare a photo taken according to the guide below → Analyze → View results")
 
     col1, col2 = st.columns(2)
     with col1:
         if st.button("Start", type="primary", use_container_width=True):
-            goto("input")
+            navigate("input")
     with col2:
         if st.button("Reset", use_container_width=True):
             reset_all("start")
@@ -114,12 +117,12 @@ def render_input():
 
         st.session_state.uploaded_file_bytes = uploaded_file.read()
         st.session_state.uploaded_file_name = uploaded_file.name
-        goto("analyze")
+        navigate("analyze")
 
     col1, col2 = st.columns(2)
     with col1:
         if st.button("Start page", use_container_width=True):
-            goto("start")
+            navigate("start")
     with col2:
         if st.button("Clear input", use_container_width=True):
             reset_to_input()
@@ -136,14 +139,14 @@ def render_analyze():
     file_bytes = st.session_state.get("uploaded_file_bytes")
     if not file_bytes:
         st.warning("No image was uploaded. Returning to the upload step.")
-        goto("input")
+        navigate("input")
 
     try:
         with st.spinner("Analyzing image..."):
             result = analyze_well_image(file_bytes)
 
         st.session_state.result = result
-        goto("result")
+        navigate("result")
 
     except Exception as e:
         st.error(f"Error during analysis: {e}")
@@ -174,7 +177,7 @@ def render_result():
     threshold_concentration = result.get("threshold_concentration")
     out_of_range = result.get("out_of_range", False)
 
-    # Decision flag (kept from your original logic)
+    # Decision flag
     above_threshold = result.get("above_threshold")
 
     # Optional technical Hue details
@@ -251,7 +254,7 @@ def render_result():
             reset_to_input()
     with a2:
         if st.button("Return to Upload", use_container_width=True):
-            goto("input")
+            navigate("input")
     with a3:
         if st.button("Start page", use_container_width=True):
             reset_all("start")
@@ -270,6 +273,8 @@ elif step == "result":
     render_result()
 else:
     reset_all("start")
+
+
 
 
 
