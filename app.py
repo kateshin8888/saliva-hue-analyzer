@@ -1,4 +1,3 @@
-import numpy as np
 import streamlit as st
 import cv2
 from analyzer import analyze_well_image
@@ -8,7 +7,7 @@ from analyzer import analyze_well_image
 # -------------------------
 st.set_page_config(
     page_title="SalivADetector (Prototype)",
-    page_icon="🧪",
+    page_icon=None,
     layout="centered",
 )
 
@@ -41,6 +40,8 @@ def reset_all(to_step: str = "start"):
 def reset_to_input():
     reset_all(to_step="input")
 
+def bgr_to_rgb(img_bgr):
+    return cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
 
 # -------------------------
 # Small UI helper (progress + header)
@@ -51,34 +52,40 @@ def render_step_header():
     st.progress((idx + 1) / len(STEPS))
     st.caption(f"Step {idx + 1}/4 · {STEP_LABEL.get(step, 'Start')}")
 
-
 # -------------------------
 # Step 1: Start
 # -------------------------
 def render_start():
     render_step_header()
 
-    st.title("🧪 SalivADetector")
-    st.write("This site analyzes the hue change from a single image and compares it to an experimentally calibrated threshold. The output may indicate a potential risk of Alzheimer's Disease")
-    st.info("Warning: This test is intended for preliminary screening for Alzheimer’s disease (AD). If the result is positive, please consult a healthcare professional for standardized diagnostic evaluation.")
+    st.title("SalivADetector")
+    st.write(
+        "This site analyzes the color change from a single image and compares it to an experimentally calibrated threshold. "
+        "The output may indicate a potential risk of Alzheimer's Disease."
+    )
+    st.info(
+        "Warning: This test is intended for preliminary screening for Alzheimer’s disease (AD). "
+        "If the result is positive, please consult a healthcare professional for standardized diagnostic evaluation."
+    )
 
-    st.markdown("**directions:** prepare the picture of the well, taken according to the directions below → analyze → view results")
+    st.markdown(
+        "**Directions:** Prepare a photo taken according to the guide below → Analyze → View results"
+    )
 
     col1, col2 = st.columns(2)
     with col1:
-        if st.button("start", type="primary", use_container_width=True):
+        if st.button("Start", type="primary", use_container_width=True):
             goto("input")
     with col2:
-        if st.button("reset", use_container_width=True):
+        if st.button("Reset", use_container_width=True):
             reset_all("start")
 
-    with st.expander("taking photo guide", expanded=True):
+    with st.expander("Photo guide", expanded=True):
         st.markdown(
-            "- use a bright, white background"
-            f"- ensure the image is clear"
-            f"- center the well in the frame"
-              )
-
+            "- Use a bright, white background\n"
+            "- Ensure the image is clear and in focus\n"
+            "- Center the target area in the frame\n"
+        )
 
 # -------------------------
 # Step 2: Input
@@ -87,7 +94,7 @@ def render_input():
     render_step_header()
 
     st.header("Upload your picture")
-    st.caption("After uploading the photo, click Analyze to proceed to the next step.")
+    st.caption("After uploading the photo, click 'Analyze' to proceed to the next step.")
 
     with st.form("upload_form", clear_on_submit=False):
         uploaded_file = st.file_uploader(
@@ -109,15 +116,13 @@ def render_input():
         st.session_state.uploaded_file_name = uploaded_file.name
         goto("analyze")
 
-    # ✅ 여기서 반드시 col1/col2 둘 다 with로 닫아줘야 함
     col1, col2 = st.columns(2)
     with col1:
-        if st.button("Starting Page", use_container_width=True):
+        if st.button("Start page", use_container_width=True):
             goto("start")
     with col2:
-        if st.button("Reset", use_container_width=True):
+        if st.button("Clear input", use_container_width=True):
             reset_to_input()
-
 
 # -------------------------
 # Step 3: Analyze
@@ -147,9 +152,8 @@ def render_analyze():
             if st.button("Upload Again", type="primary", use_container_width=True):
                 reset_to_input()
         with col2:
-            if st.button("Starting Page", use_container_width=True):
+            if st.button("Start page", use_container_width=True):
                 reset_all("start")
-
 
 # -------------------------
 # Step 4: Result
@@ -165,35 +169,60 @@ def render_result():
             reset_to_input()
         return
 
+    # Main values (expected from analyzer.py)
+    concentration_est = result.get("concentration_est")
+    threshold_concentration = result.get("threshold_concentration")
+    out_of_range = result.get("out_of_range", False)
+
+    # Decision flag (kept from your original logic)
+    above_threshold = result.get("above_threshold")
+
+    # Optional technical Hue details
     avg_h_cv = result.get("avg_h_cv")
     avg_h_deg = result.get("avg_h_deg")
     threshold_deg = result.get("threshold_deg")
     threshold_cv = result.get("threshold_cv")
-    above_threshold = result.get("above_threshold")
+
     img_bgr = result.get("img_bgr")
-
-    img_rgb = None
     if img_bgr is not None:
-        img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
+        st.subheader("Input image")
+        st.image(bgr_to_rgb(img_bgr), use_column_width=True)
 
-    if above_threshold:
-        st.warning(
-            "**Alzheimer's positive**\n\n"
-            "Please seek professional help."
-        )
+    if above_threshold is True:
+        st.warning("**Alzheimer's positive**\n\nPlease seek professional help.")
+    elif above_threshold is False:
+        st.success("**Alzheimer's negative**\n\n")
     else:
-        st.success(
-            "**Alzheimer's negative**\n\n"
-        )
+        st.info("**Result unavailable**\n\nMissing threshold comparison output.")
 
     col1, col2 = st.columns(2)
 
     with col1:
         st.subheader("Key metrics")
-        st.metric("Average Hue (deg)", f"{avg_h_deg:.2f}" if avg_h_deg is not None else "N/A")
-        st.metric("Threshold (deg)", f"{threshold_deg:.2f}" if threshold_deg is not None else "N/A")
+
+        st.metric(
+            "Estimated concentration",
+            f"{concentration_est:.4f}" if concentration_est is not None else "N/A"
+        )
+        st.metric(
+            "Threshold concentration",
+            f"{threshold_concentration:.4f}" if threshold_concentration is not None else "N/A"
+        )
+
+        if out_of_range:
+            st.warning("Estimated concentration may be out of the valid calibration range.")
 
         with st.expander("Show technical details"):
+            st.write(
+                f"**Average Hue (deg):** `{avg_h_deg:.2f}`"
+                if avg_h_deg is not None else
+                "**Average Hue (deg):** N/A"
+            )
+            st.write(
+                f"**Threshold Hue (deg):** `{threshold_deg:.2f}`"
+                if threshold_deg is not None else
+                "**Threshold Hue (deg):** N/A"
+            )
             st.write(
                 f"**Average Hue (OpenCV 0–179):** `{avg_h_cv:.2f}`"
                 if avg_h_cv is not None else
@@ -205,16 +234,14 @@ def render_result():
                 "**Threshold Hue (OpenCV):** N/A"
             )
 
-
     with st.expander("How was the data calculated?"):
         td = f"{threshold_deg:.2f}" if threshold_deg is not None else "N/A"
-        st.write( "- The calibration curve is adjusted using the positive and negative reference controls captured in the same image. "
-        "The sample’s hue value is then mapped onto the adjusted curve. "
-        "Because the calculation is based on relative values within the same photo, results are less sensitive to differences in capture conditions (e.g., lighting).\n"
-        f"- The threshold is derived from experimental calibration (e.g., `{td}`°).\n"
-        "- Lactoferrin is a proposed biomarker associated with Alzheimer’s disease (AD). "
-        "An 'Above threshold' result indicates a stronger color change, which may correspond to a higher lactoferrin level in saliva.\n\n"
-        "**Important:** This output is intended for preliminary screening only and indicates possibility rather than a definitive diagnosis."
+        st.write(
+            "- The hue value is computed from the uploaded image and converted to concentration using an experimentally derived calibration curve.\n"
+            f"- The threshold is derived from experimental calibration (e.g., `{td}`°).\n"
+            "- Lactoferrin is a proposed biomarker associated with Alzheimer’s disease (AD). "
+            "An 'Above threshold' result indicates a stronger color change, which may correspond to a higher lactoferrin level in saliva.\n\n"
+            "**Important:** This output is intended for preliminary screening only and indicates possibility rather than a definitive diagnosis."
         )
 
     st.subheader("Next actions")
@@ -226,9 +253,8 @@ def render_result():
         if st.button("Return to Upload", use_container_width=True):
             goto("input")
     with a3:
-        if st.button("Start Page", use_container_width=True):
+        if st.button("Start page", use_container_width=True):
             reset_all("start")
-
 
 # -------------------------
 # Router
@@ -244,9 +270,6 @@ elif step == "result":
     render_result()
 else:
     reset_all("start")
-
-
-
 
 
 
