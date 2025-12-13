@@ -172,72 +172,83 @@ def render_result():
             reset_to_input()
         return
 
-    # Main values (expected from analyzer.py)
-    concentration_est = result.get("concentration_est")
-    threshold_concentration = result.get("threshold_concentration")
-    out_of_range = result.get("out_of_range", False)
+    # ---- Decision flag (prefer concentration-based flag if you add it in analyzer.py) ----
+    screening_positive = result.get("screening_positive", None)
+    if screening_positive is None:
+        # fallback to whatever you used before
+        screening_positive = result.get("above_threshold", None)
 
-    # Decision flag
-    above_threshold = result.get("above_threshold")
-
-    # Optional technical Hue details
-    avg_h_cv = result.get("avg_h_cv")
-    avg_h_deg = result.get("avg_h_deg")
-    threshold_deg = result.get("threshold_deg")
-    threshold_cv = result.get("threshold_cv")
-
-    img_bgr = result.get("img_bgr")
-    if img_bgr is not None:
-        st.subheader("Input image")
-        st.image(bgr_to_rgb(img_bgr), use_column_width=True)
-
-    if above_threshold is True:
+    # ---- Show ONLY the screening conclusion by default ----
+    if screening_positive is True:
         st.warning("**Alzheimer's positive**\n\nPlease seek professional help.")
-    elif above_threshold is False:
+    elif screening_positive is False:
         st.success("**Alzheimer's negative**\n\n")
     else:
-        st.info("**Result unavailable**\n\nMissing threshold comparison output.")
+        st.info("**Result unavailable**\n\nMissing decision output.")
 
-    col1, col2 = st.columns(2)
+    # =========================
+    # EVERYTHING ELSE IS HIDDEN
+    # =========================
+    with st.expander("See more info", expanded=False):
 
-    with col1:
+        # Image
+        img_bgr = result.get("img_bgr")
+        if img_bgr is not None:
+            st.subheader("Input image")
+            st.image(bgr_to_rgb(img_bgr), use_column_width=True)
+
+        # Main values
+        concentration_est = result.get("concentration_est")
+        concentration_raw = result.get("concentration_raw", concentration_est)
+        threshold_concentration = result.get("threshold_concentration")
+
+        below_range = result.get("below_range", False)
+        above_range = result.get("above_range", False)
+        out_of_range = result.get("out_of_range", False)
+
+        # Display-safe concentration (never show negative)
+        conc_display = None
+        try:
+            if concentration_est is not None:
+                conc_display = float(concentration_est)
+                if conc_display < 0:
+                    conc_display = 0.0
+                    below_range = True
+                    out_of_range = True
+        except Exception:
+            conc_display = None
+
         st.subheader("Key metrics")
-
         st.metric(
             "Estimated concentration",
-            f"{concentration_est:.4f}" if concentration_est is not None else "N/A"
+            f"{conc_display:.4f}" if conc_display is not None else "N/A"
         )
         st.metric(
             "Threshold concentration",
-            f"{threshold_concentration:.4f}" if threshold_concentration is not None else "N/A"
+            f"{float(threshold_concentration):.4f}" if threshold_concentration is not None else "N/A"
         )
 
-        if out_of_range:
+        # Range messaging (clear + defensible)
+        if below_range:
+            st.info("Estimated concentration is below the calibration range (reported as 0).")
+        if above_range:
+            st.warning("Estimated concentration is above the calibration range (may be capped).")
+        if out_of_range and not (below_range or above_range):
             st.warning("Estimated concentration may be out of the valid calibration range.")
 
-        with st.expander("Show technical details"):
-            st.write(
-                f"**Average Hue (deg):** `{avg_h_deg:.2f}`"
-                if avg_h_deg is not None else
-                "**Average Hue (deg):** N/A"
-            )
-            st.write(
-                f"**Threshold Hue (deg):** `{threshold_deg:.2f}`"
-                if threshold_deg is not None else
-                "**Threshold Hue (deg):** N/A"
-            )
-            st.write(
-                f"**Average Hue (OpenCV 0–179):** `{avg_h_cv:.2f}`"
-                if avg_h_cv is not None else
-                "**Average Hue (OpenCV 0–179):** N/A"
-            )
-            st.write(
-                f"**Threshold Hue (OpenCV):** `{threshold_cv:.2f}`"
-                if threshold_cv is not None else
-                "**Threshold Hue (OpenCV):** N/A"
-            )
+        # Technical Hue details (no nested expanders)
+        avg_h_cv = result.get("avg_h_cv")
+        avg_h_deg = result.get("avg_h_deg")
+        threshold_deg = result.get("threshold_deg")
+        threshold_cv = result.get("threshold_cv")
 
-    with st.expander("How was the data calculated?"):
+        st.subheader("Technical details")
+        st.write(f"**Average Hue (deg):** `{avg_h_deg:.2f}`" if avg_h_deg is not None else "**Average Hue (deg):** N/A")
+        st.write(f"**Threshold Hue (deg):** `{threshold_deg:.2f}`" if threshold_deg is not None else "**Threshold Hue (deg):** N/A")
+        st.write(f"**Average Hue (OpenCV 0–179):** `{avg_h_cv:.2f}`" if avg_h_cv is not None else "**Average Hue (OpenCV 0–179):** N/A")
+        st.write(f"**Threshold Hue (OpenCV):** `{threshold_cv:.2f}`" if threshold_cv is not None else "**Threshold Hue (OpenCV):** N/A")
+
+        st.subheader("How was the data calculated?")
         td = f"{threshold_deg:.2f}" if threshold_deg is not None else "N/A"
         st.write(
             "- The hue value is computed from the uploaded image and converted to concentration using an experimentally derived calibration curve.\n"
@@ -247,6 +258,14 @@ def render_result():
             "**Important:** This output is intended for preliminary screening only and indicates possibility rather than a definitive diagnosis."
         )
 
+        # Optional: show raw numbers for debugging
+        if concentration_raw is not None:
+            try:
+                st.caption(f"Debug: concentration_raw = {float(concentration_raw):.4f}")
+            except Exception:
+                pass
+
+    # Keep your action buttons visible (if you want these hidden too, move them into the expander)
     st.subheader("Next actions")
     a1, a2, a3 = st.columns(3)
     with a1:
@@ -258,7 +277,6 @@ def render_result():
     with a3:
         if st.button("Start page", use_container_width=True):
             reset_all("start")
-
 # -------------------------
 # Router
 # -------------------------
@@ -273,6 +291,7 @@ elif step == "result":
     render_result()
 else:
     reset_all("start")
+
 
 
 
